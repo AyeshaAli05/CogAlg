@@ -5,7 +5,6 @@ import scipy
 import scipy.fftpack
 import numpy as np
 from matplotlib import pyplot as plt
-
 fs_rate, signal = wavfile.read("D:\count.wav")
 print ("Frequency sampling", fs_rate)
 l_audio = len(signal.shape)
