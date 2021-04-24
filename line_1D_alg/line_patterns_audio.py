@@ -38,7 +38,6 @@ p2 = plt.plot(freqs, FFT, "r") # plotting the complete fft spectrum
 plt.xlabel('Frequency (Hz)')
 plt.ylabel('Count dbl-sided')
 plt.subplot(413)
-#p3 = plt.plot(t, IFFT_side, "g")
 p3 = plt.plot(freqs_side, abs(FFT_side), "b") # plotting the positive fft spectrum
 plt.xlabel('Frequency (Hz)')
 plt.ylabel('Count single-sided')
