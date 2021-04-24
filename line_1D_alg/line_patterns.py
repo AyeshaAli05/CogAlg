@@ -1,26 +1,3 @@
-'''
-  line_patterns is a principal version of 1st-level 1D algorithm
-  Operations:
-
-- Cross-compare consecutive pixels within each row of image, forming dert_: queue of derts, each a tuple of derivatives per pixel.
-  dert_ is then segmented into patterns Pms and Pds: contiguous sequences of pixels forming same-sign match or difference.
-  Initial match is inverse deviation of variation: m = ave_|d| - |d|, rather than minimum for directly defined match:
-  albedo or intensity of reflected light doesn't correlate with predictive value of the object that reflects it.
-
-- Match patterns Pms are spans of inputs forming same-sign match. Positive Pms contain high-match pixels, which are likely
-  to match more distant pixels. Thus, positive Pms are evaluated for cross-comp of pixels over incremented range.
-- Difference patterns Pds are spans of inputs forming same-sign ds. d sign match is a precondition for d match, so only
-  same-sign spans (Pds) are evaluated for cross-comp of constituent differences, which forms higher derivatives.
-  (d match = min: rng+ comp value: predictive value of difference is proportional to its magnitude, although inversely so)
-
-  Both extended cross-comp forks are recursive: resulting sub-patterns are evaluated for deeper cross-comp, same as top patterns.
-  Both forks are currently exclusive per P to avoid redundancy, but they can be made partly or fully overlapping.
-
-  Initial bilateral cross-comp here is 1D slice of 2D 3x3 kernel, while unilateral d is equivalent to 2x2 kernel.
-  Odd kernels preserve resolution of pixels, while 2x2 kernels preserve resolution of derivatives, in resulting derts.
-  The former should be used in rng_comp and the latter in der_comp, which may alternate with intra_P.
-'''
-
 import cv2
 import argparse
 from time import time
