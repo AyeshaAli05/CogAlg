@@ -35,6 +35,8 @@ from class_cluster import ClusterStructure, NoneType
 
 ave = 30  # filter or hyper-parameter, set as a guess, latter adjusted by feedback
 aveB = 50
+ave_M = 100
+ave_mP = 100
 UNFILLED = -1
 EXCLUDED_ID = -2
 
@@ -97,7 +99,6 @@ class CBlob(ClusterStructure):
     prior_forks = list
     adj_blobs = list  # for borrowing and merging
     dir_blobs = list  # primarily vertically | laterally oriented edge blobs
-    dir_val = int     # directional value in dir_blobs
     fsliced = bool
 
     PPmm_ = list  # comp_slice_ if not empty
@@ -109,6 +110,44 @@ class CBlob(ClusterStructure):
     derPd__ = list
     Pd__ = list
 
+# draft
+def comp_pixel_hybrid(image):  # 3x3 kernel M and 2x2 quadrant G, see comp_pixel_versions file for other versions and more explanation
+    '''
+    In general, M should be defined in odd-sized kernels, and G in their even-sized quadrants, initially 2x2 quadrants in 3x3 kernels.
+    Same as d in line_patterns, translated into 2D. 2x2 M is very close to G, but they are different in 3x3 and higher kernels.
+    M is omnilateral relative to central dert because it's not directional and defines value of that dert,
+    G is unilateral higher-derivation directional comparand, thus also higher-resolution to preserve direction 2x2
+    '''
+    # input slices into sliding 3x3 kernel, each slice is a shifted 2D frame of grey-scale pixels:
+    topleft__     = image[:-2, :-2]
+    top__         = image[:-2,1:-1]
+    topright__    = image[:-2, 2:]
+    right__       = image[1:-1, 2:]
+    bottomright__ = image[2:, 2:]
+    bottom__      = image[2:,1:-1]
+    bottomleft__  = image[2:, :-2]
+    left__        = image[1:-1,:-2]
+    center__      = image[1:-1,1:-1]
+
+    # using bottom right quarant of 3x3 kernel -> 2x2
+    rot_Gy__ = bottomright__ - center__  # rotated to bottom__ - top__
+    rot_Gx__ = right__ - bottom__  # rotated to right__ - left__
+
+    # deviation of central gradient per kernel, between four vertex pixels
+    G__ = (np.hypot(rot_Gy__, rot_Gx__) - ave).astype('int')
+
+    # inverse deviation of SAD: variation
+    M__ = int(ave * 1.2)  - (abs(center__ - topleft__)     +
+                             abs(center__ - top__)         +
+                             abs(center__ - topright__)    +
+                             abs(center__ - right__)       +
+                             abs(center__ - bottomright__) +
+                             abs(center__ - bottom__)      +
+                             abs(center__ - bottomleft__)  +
+                             abs(center__ - left__))
+
+    return (center__, rot_Gy__, rot_Gx__, G__, M__)  # tuple of 2D arrays per param of dert (derivatives' tuple)
+    # renamed dert__ = (p__, dy__, dx__, g__, m__) for readability in functions below
 
 def comp_pixel(image):  # 2x2 pixel cross-correlation within image, a standard edge detection operator
     # see comp_pixel_versions file for other versions and more explanation
@@ -155,7 +194,7 @@ def derts2blobs(dert__, verbose=False, render=False, use_c=False):
             M += blob.Dert.M
         frame = FrameOfBlobs(I=I, Dy=Dy, Dx=Dx, G=G, M=M, blob_=blob_, dert__=dert__)
 
-    assign_adjacents(adj_pairs)
+    assign_adjacents(adj_pairs)  # f_segment_by_direction=False
 
     if verbose: print(f"{len(frame.blob_)} blobs formed in {time() - start_time} seconds")
     if render: visualize_blobs(idmap, frame.blob_)
@@ -244,18 +283,6 @@ def flood_fill(dert__, sign__, verbose=False, mask__=None, blob_cls=CBlob, fseg=
                         elif blob.sign != sign__[y2, x2]:
                             adj_pairs.add((idmap[y2, x2], blob.id))     # blob.id always bigger
 
-                     # temporary commented out, still buggy
-#                    if fseg: # if call from segment by direction, add checking for diagonal directions
-#                        new_adj_coords = [(y1 - 1, x1 - 1), (y1 - 1, x1 + 1),
-#                                          (y1 + 1, x1 + 1), (y1 + 1, x1 - 1)]
-#
-#                        for y2, x2 in new_adj_coords:
-#                        # if image boundary is not reached, is filled , and not same-signed: add adjacency
-#                            if not (y2 < 0 or y2 >= height or x2 < 0 or x2 >= width or idmap[y2, x2] == EXCLUDED_ID) and not \
-#                            (idmap[y2, x2] == UNFILLED) and \
-#                            (blob.sign != sign__[y2, x2]):
-#                                adj_pairs.add((idmap[y2, x2], blob.id))     # blob.id always bigger
-
                 # terminate blob
                 yn += 1
                 xn += 1
@@ -296,6 +323,11 @@ def assign_adjacents(adj_pairs, blob_cls=CBlob):  # adjacents are connected oppo
             raise ValueError("something is wrong with pose")
 
         # bilateral assignments
+        '''
+        if f_segment_by_direction:  # pose is not needed
+            blob1.adj_blobs.append(blob2)
+            blob2.adj_blobs.append(blob1)
+        '''
         blob1.adj_blobs[0].append(blob2)
         blob1.adj_blobs[1].append(pose2)
         blob2.adj_blobs[0].append(blob1)
@@ -315,11 +347,12 @@ def print_deep_blob_forking(deep_layer):
         if len(deep_layer)>0:
             check_deep_blob(deep_layer,i)
 
+
 if __name__ == "__main__":
-    # Imports
     import argparse
     from time import time
     from utils import imread
+    from comp_blob_draft import cross_comp_blobs
 
     # Parse arguments
     argument_parser = argparse.ArgumentParser()
@@ -388,6 +421,8 @@ if __name__ == "__main__":
         if args.verbose:
             print_deep_blob_forking(deep_layers)
             print("\rFinished intra_blob")
+
+        cross_comp_blobs(frame.blob_)
 
     end_time = time() - start_time
 
